@@ -211,8 +211,8 @@ if not st.session_state.logged_in:
     </style>
 
     <div class="top-nav">
-        <a href="?page=home" class="nav-item nav-home">🏠 Home Page</a>
-        <a href="?page=auth" class="nav-item nav-login"> Login Page</a>
+        <a href="?page=home" class="nav-item nav-home" target="_self">🏠 Home Page</a>
+        <a href="?page=auth" class="nav-item nav-login" target="_self"> Login Page</a>
         <div class="nav-glow"></div>
     </div>
     """, unsafe_allow_html=True)
@@ -294,7 +294,7 @@ if not st.session_state.logged_in and st.session_state.page == "auth":
 st.sidebar.markdown("## 👋 TEAM CORE FOUR")
 st.sidebar.divider()
 st.sidebar.markdown(f"👤 **User:** `{st.session_state.user}`")
-st.sidebar.markdown(f"🎭 **Role:** `{st.session_state.role.upper()}`")
+st.sidebar.markdown(f"🎭 **Role:** `{st.session_state.role}`")
 st.sidebar.divider()
 
 # ================== UTIL ==================

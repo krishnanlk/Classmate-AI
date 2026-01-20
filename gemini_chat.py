@@ -1,6 +1,6 @@
 from gemini_config import client
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-2.5-flash-lite"
 
 def gemini_chat(question, lecture_context=None):
     """

@@ -3,11 +3,11 @@ from dotenv import load_dotenv
 from google import genai
 
 # Load gemini.env file
-load_dotenv("gemini.env")
+load_dotenv(".env")
 
-API_KEY = os.getenv("GEMINI_API_KEY")
-
+API_KEY = os.getenv("GEMI_API_KEY")
+print("API Key loaded:", API_KEY)
 if not API_KEY:
-    raise ValueError("GEMINI_API_KEY not found. Check gemini.env file")
+    raise ValueError("GEMI_API_KEY not found. Check .env file")
 
 client = genai.Client(api_key=API_KEY)

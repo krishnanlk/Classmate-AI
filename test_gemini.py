@@ -1,25 +1,18 @@
 import os
-from dotenv import load_dotenv
-import google.generativeai as genai
+from flask.cli import load_dotenv
+from google.genai import Client
 
-# Load environment variables
-load_dotenv()
 
-# Get API key from .env
-API_KEY = os.getenv("GEMINI_API_KEY")
+# Load gemini.env file
+load_dotenv(".env")
+# Make sure your new key is set in environment variables
+API_KEY = os.getenv("GEMI_API_KEY")
+print("Using API Key:", API_KEY)
+client = Client(api_key=API_KEY)
 
-if not API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in .env file")
-
-# Configure Gemini
-genai.configure(api_key=API_KEY)
-
-# Load Gemini 2.5 Flash model
-model = genai.GenerativeModel("models/gemini-2.5-flash")
-
-# Test prompt
-response = model.generate_content(
-    "Explain Gemini 2.5 Flash in one line."
+response = client.models.generate_content(
+    model="gemini-3-flash-preview",
+    contents="Explain Gemini 2.5 Flash in one line."
 )
 
-print(response.text)
+print(response)
