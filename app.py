@@ -383,28 +383,90 @@ div[data-testid="stRadio"] > label {
 </style>
 """, unsafe_allow_html=True)
 
-# ================== SESSION INIT ==================
-SESSION_FILE = ".session_state.json"
+# ================== SESSION INIT (COOKIE-BASED) ==================
+# JavaScript for cookie management
+st.markdown("""
+<script>
+function setCookie(name, value, days=7) {
+    const d = new Date();
+    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+    const expires = "expires=" + d.toUTCString();
+    document.cookie = name + "=" + value + ";" + expires + ";path=/";
+}
 
-# Load session from file if exists
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for(let i=0; i<ca.length; i++) {
+        let c = ca[i].trim();
+        if(c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length);
+    }
+    return null;
+}
+
+function deleteCookie(name) {
+    setCookie(name, "", -1);
+}
+
+// Store session info when login happens
+function storeSessionCookie(user, role) {
+    setCookie('classmate_user', user, 7);
+    setCookie('classmate_role', role, 7);
+    setCookie('classmate_logged_in', 'true', 7);
+}
+
+// Get session from cookies
+function getSessionFromCookie() {
+    const user = getCookie('classmate_user');
+    const role = getCookie('classmate_role');
+    const logged_in = getCookie('classmate_logged_in');
+    return { user, role, logged_in: logged_in === 'true' };
+}
+
+// Clear session cookies
+function clearSessionCookie() {
+    deleteCookie('classmate_user');
+    deleteCookie('classmate_role');
+    deleteCookie('classmate_logged_in');
+}
+
+// Try to restore session from cookies
+window.addEventListener('load', function() {
+    const session = getSessionFromCookie();
+    if(session.logged_in) {
+        // Session found in cookies - will be handled by Python
+    }
+});
+</script>
+""", unsafe_allow_html=True)
+
+# Initialize session state - load from cookies if available
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user = None
+    st.session_state.role = None
+
+# Clean up any existing session file
+SESSION_FILE = ".session_state.json"
 if os.path.exists(SESSION_FILE):
     try:
-        with open(SESSION_FILE, "r") as f:
-            saved_session = json.load(f)
-            if "logged_in" not in st.session_state:
-                st.session_state.logged_in = saved_session.get("logged_in", False)
-                st.session_state.user = saved_session.get("user", None)
-                st.session_state.role = saved_session.get("role", None)
+        os.remove(SESSION_FILE)
     except:
-        if "logged_in" not in st.session_state:
-            st.session_state.logged_in = False
-            st.session_state.user = None
-            st.session_state.role = None
-else:
+        pass
+
+# Load session from query params if available
+if "user" in st.query_params and "role" in st.query_params:
+    # Session info in URL - restore it
     if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-        st.session_state.user = None
-        st.session_state.role = None
+        st.session_state.logged_in = True
+        st.session_state.user = st.query_params.get("user")
+        st.session_state.role = st.query_params.get("role")
+
+# Initialize session state
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user = None
+    st.session_state.role = None
 
 if "page" not in st.session_state:
     st.session_state.page = "home"
@@ -416,16 +478,28 @@ if "page" not in st.query_params:
 if st.query_params.get("page"):
     st.session_state.page = st.query_params.get("page")
 
-# Handle logout from navbar link - must be before dashboard redirect
-if st.session_state.logged_in and st.session_state.page == "home":
-    # Check if this is a logout action (user was previously logged in on home page)
-    # For now, we'll use the sidebar button instead
-    pass
+# Page routing logic - only redirect if necessary
+logged_in = st.session_state.logged_in
+current_page = st.session_state.page
 
-# Set default page to dashboard after login (when coming from auth/home)
-elif st.session_state.logged_in and st.session_state.page in ["home", "auth"]:
-    st.session_state.page = "dashboard"
-    st.query_params["page"] = "dashboard"
+if logged_in:
+    # User is logged in
+    # Keep user and role in query params for persistence
+    if "user" not in st.query_params or "role" not in st.query_params:
+        st.query_params["user"] = st.session_state.user
+        st.query_params["role"] = st.session_state.role
+    
+    # Redirect from auth/home to dashboard on first login
+    if current_page in ["home", "auth"]:
+        st.session_state.page = "dashboard"
+        st.query_params["page"] = "dashboard"
+    # Allow dashboard, chat, upload pages
+else:
+    # User is NOT logged in
+    # Only allow home and auth pages
+    if current_page not in ["home", "auth"]:
+        st.session_state.page = "home"
+        st.query_params["page"] = "home"
 
 
 # ================== NAVBAR (ALWAYS VISIBLE) ==================
@@ -983,13 +1057,10 @@ if not st.session_state.logged_in and st.session_state.page == "auth":
             st.session_state.user = username
             st.session_state.role = users[username]["role"]
             
-            # Save session to file for persistence
-            with open(SESSION_FILE, "w") as f:
-                json.dump({
-                    "logged_in": True,
-                    "user": username,
-                    "role": users[username]["role"]
-                }, f)
+            # Store session in URL query params for persistence across page navigation
+            st.query_params["user"] = username
+            st.query_params["role"] = users[username]["role"]
+            st.query_params["page"] = "dashboard"
             
             st.success("✅ Login successful! Redirecting...")
             st.rerun()
@@ -1026,9 +1097,13 @@ st.sidebar.markdown("""
 
 st.sidebar.markdown("<div class='sidebar-header'>👋 TEAM CORE FOUR</div>", unsafe_allow_html=True)
 st.sidebar.divider()
-st.sidebar.markdown(f"<div class='sidebar-item'>👤 <strong>User:</strong> {st.session_state.user}</div>", unsafe_allow_html=True)
-st.sidebar.markdown(f"<div class='sidebar-item'>🎭 <strong>Role:</strong> {st.session_state.role}</div>", unsafe_allow_html=True)
+st.sidebar.markdown(f"<div class='sidebar-item'>👤 <strong>User:</strong> {st.session_state.user if st.session_state.user else 'Not logged in'}</div>", unsafe_allow_html=True)
+st.sidebar.markdown(f"<div class='sidebar-item'>🎭 <strong>Role:</strong> {st.session_state.role if st.session_state.role else 'None'}</div>", unsafe_allow_html=True)
 st.sidebar.divider()
+
+# Only show menu and pages if logged in
+if not st.session_state.logged_in:
+    st.stop()
 
 # ================== UTIL ==================
 def clean_text(text):
@@ -1284,8 +1359,15 @@ QUESTION:
 # ================== LOGOUT ==================
 st.sidebar.divider()
 if st.sidebar.button("🚪 Logout"):
-    st.session_state.clear()
-    # Clear session file
-    if os.path.exists(SESSION_FILE):
-        os.remove(SESSION_FILE)
+    # Clear all session state variables
+    st.session_state.logged_in = False
+    st.session_state.user = None
+    st.session_state.role = None
+    st.session_state.page = "home"
+    
+    # Clear query params (keep only page)
+    st.query_params.clear()
+    st.query_params["page"] = "home"
+    
+    # Rerun to show login page
     st.rerun()
