@@ -1,0 +1,1 @@
+This lecture covers testcase from unit_1 of AI. It explains key concepts discussed during the session.

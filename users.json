@@ -1,0 +1,18 @@
+{
+  
+  "staff1": {
+    "password": "staff123",
+    "role": "staff",
+    "subjects": ["AI"]
+  },
+  "stu1": {
+    "password": "stu123",
+    "role": "student",
+    "subjects": ["AI"]
+  },
+    "lk": {
+    "password": "lk123",
+    "role": "admin",
+    "subjects": ["AI"]
+  }
+}

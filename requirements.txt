@@ -1,0 +1,11 @@
+streamlit
+openai-whisper
+torch
+transformers
+pytube
+ffmpeg-python
+scikit-learn
+numpy
+whisper
+
+

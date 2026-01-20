@@ -1,0 +1,1 @@
+This lecture covers Sample_topic from UNIT_3 of AI. It explains core concepts and examples.

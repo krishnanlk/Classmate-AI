@@ -1,0 +1,1 @@
+This lecture covers Sample_topic_for_test from UNIT_2 of DBMS. It explains core concepts and examples.

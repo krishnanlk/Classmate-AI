@@ -1,0 +1,1 @@
+This lecture covers Alogorithm_ from Unit-1 of DAA. It explains core concepts, definitions, and examples. The session helps students clearly understand Alogorithm_.
