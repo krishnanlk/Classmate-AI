@@ -383,90 +383,21 @@ div[data-testid="stRadio"] > label {
 </style>
 """, unsafe_allow_html=True)
 
-# ================== SESSION INIT (COOKIE-BASED) ==================
-# JavaScript for cookie management
-st.markdown("""
-<script>
-function setCookie(name, value, days=7) {
-    const d = new Date();
-    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-    const expires = "expires=" + d.toUTCString();
-    document.cookie = name + "=" + value + ";" + expires + ";path=/";
-}
-
-function getCookie(name) {
-    const nameEQ = name + "=";
-    const ca = document.cookie.split(';');
-    for(let i=0; i<ca.length; i++) {
-        let c = ca[i].trim();
-        if(c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length);
-    }
-    return null;
-}
-
-function deleteCookie(name) {
-    setCookie(name, "", -1);
-}
-
-// Store session info when login happens
-function storeSessionCookie(user, role) {
-    setCookie('classmate_user', user, 7);
-    setCookie('classmate_role', role, 7);
-    setCookie('classmate_logged_in', 'true', 7);
-}
-
-// Get session from cookies
-function getSessionFromCookie() {
-    const user = getCookie('classmate_user');
-    const role = getCookie('classmate_role');
-    const logged_in = getCookie('classmate_logged_in');
-    return { user, role, logged_in: logged_in === 'true' };
-}
-
-// Clear session cookies
-function clearSessionCookie() {
-    deleteCookie('classmate_user');
-    deleteCookie('classmate_role');
-    deleteCookie('classmate_logged_in');
-}
-
-// Try to restore session from cookies
-window.addEventListener('load', function() {
-    const session = getSessionFromCookie();
-    if(session.logged_in) {
-        // Session found in cookies - will be handled by Python
-    }
-});
-</script>
-""", unsafe_allow_html=True)
-
-# Initialize session state - load from cookies if available
+# ================== SESSION INIT ==================
+# Initialize session state first
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = None
     st.session_state.role = None
 
-# Clean up any existing session file
-SESSION_FILE = ".session_state.json"
-if os.path.exists(SESSION_FILE):
-    try:
-        os.remove(SESSION_FILE)
-    except:
-        pass
-
-# Load session from query params if available
+# Always restore session from query params if available (for persistence across reloads)
+# This ensures session persists even after page refresh
 if "user" in st.query_params and "role" in st.query_params:
-    # Session info in URL - restore it
-    if "logged_in" not in st.session_state:
+    # Only restore if not already logged in or if credentials in URL differ
+    if not st.session_state.logged_in or st.session_state.user != st.query_params.get("user"):
         st.session_state.logged_in = True
         st.session_state.user = st.query_params.get("user")
         st.session_state.role = st.query_params.get("role")
-
-# Initialize session state
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user = None
-    st.session_state.role = None
 
 if "page" not in st.session_state:
     st.session_state.page = "home"
@@ -484,22 +415,29 @@ current_page = st.session_state.page
 
 if logged_in:
     # User is logged in
-    # Keep user and role in query params for persistence
-    if "user" not in st.query_params or "role" not in st.query_params:
-        st.query_params["user"] = st.session_state.user
-        st.query_params["role"] = st.session_state.role
-    
+    # Always keep user and role in query params for session persistence
+    st.query_params["user"] = st.session_state.user
+    st.query_params["role"] = st.session_state.role
+
     # Redirect from auth/home to dashboard on first login
     if current_page in ["home", "auth"]:
         st.session_state.page = "dashboard"
         st.query_params["page"] = "dashboard"
+        st.rerun()
     # Allow dashboard, chat, upload pages
 else:
     # User is NOT logged in
+    # Clear user and role from query params
+    if "user" in st.query_params:
+        del st.query_params["user"]
+    if "role" in st.query_params:
+        del st.query_params["role"]
+
     # Only allow home and auth pages
     if current_page not in ["home", "auth"]:
         st.session_state.page = "home"
         st.query_params["page"] = "home"
+        st.rerun()
 
 
 # ================== NAVBAR (ALWAYS VISIBLE) ==================
@@ -750,10 +688,26 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
+# Check for logout action from navbar
+if st.query_params.get("action") == "logout":
+    # Clear session state
+    st.session_state.logged_in = False
+    st.session_state.user = None
+    st.session_state.role = None
+    st.session_state.page = "home"
+
+    # Clear all query params
+    st.query_params.clear()
+    st.query_params["page"] = "home"
+    st.rerun()
+
 # Navbar content based on login state
 if st.session_state.logged_in:
-    upload_link = '<li class="navbar-item"><a href="?page=upload" class="navbar-link" target="_self">📤 Upload</a></li>' if st.session_state.role == "staff" else ''
-    navbar_html = f"""<nav class="navbar"><div class="navbar-container"><a href="?page=dashboard" class="navbar-brand" target="_self">🎓 Classmate AI</a><input type="checkbox" id="navbar-toggle-checkbox"><label for="navbar-toggle-checkbox" class="navbar-toggle-label"><span></span><span></span><span></span></label><ul class="navbar-menu"><li class="navbar-item"><a href="?page=dashboard" class="navbar-link" target="_self">📺 Lectures</a></li><li class="navbar-item"><a href="?page=chat" class="navbar-link" target="_self">🤖 Chat</a></li>{upload_link}<li class="navbar-item"><span class="navbar-user-info">👤 {st.session_state.user}</span></li><li class="navbar-item"><a href="?page=home" class="navbar-link btn-logout" target="_self">🚪 Logout</a></li></ul></div></nav>"""
+    # Include user and role in all navigation links to preserve session
+    user_param = st.session_state.user
+    role_param = st.session_state.role
+    upload_link = f'<li class="navbar-item"><a href="?page=upload&user={user_param}&role={role_param}" class="navbar-link" target="_self">📤 Upload</a></li>' if st.session_state.role == "staff" else ''
+    navbar_html = f"""<nav class="navbar"><div class="navbar-container"><a href="?page=dashboard&user={user_param}&role={role_param}" class="navbar-brand" target="_self">🎓 Classmate AI</a><input type="checkbox" id="navbar-toggle-checkbox"><label for="navbar-toggle-checkbox" class="navbar-toggle-label"><span></span><span></span><span></span></label><ul class="navbar-menu"><li class="navbar-item"><a href="?page=dashboard&user={user_param}&role={role_param}" class="navbar-link" target="_self">📺 Lectures</a></li><li class="navbar-item"><a href="?page=chat&user={user_param}&role={role_param}" class="navbar-link" target="_self">🤖 Chat</a></li>{upload_link}<li class="navbar-item"><span class="navbar-user-info">👤 {st.session_state.user}</span></li><li class="navbar-item"><a href="?action=logout" class="navbar-link btn-logout" target="_self">🚪 Logout</a></li></ul></div></nav>"""
     st.markdown(navbar_html, unsafe_allow_html=True)
 else:
     navbar_html = """<nav class="navbar"><div class="navbar-container"><a href="?page=home" class="navbar-brand" target="_self">🎓 Classmate AI</a><input type="checkbox" id="navbar-toggle-checkbox"><label for="navbar-toggle-checkbox" class="navbar-toggle-label"><span></span><span></span><span></span></label><ul class="navbar-menu"><li class="navbar-item"><a href="?page=home" class="navbar-link" target="_self">🏠 Home</a></li><li class="navbar-item"><a href="?page=auth" class="navbar-link active" target="_self">🔐 Login</a></li></ul></div></nav>"""
@@ -912,140 +866,338 @@ if not st.session_state.logged_in and st.session_state.page == "auth":
 
     st.markdown("""
     <style>
-    .stMainBlockContainer {
+    /* Hide all Streamlit default elements on login page */
+    [data-testid="stHeader"],
+    [data-testid="stDecoration"],
+    [data-testid="stToolbar"],
+    .stDeployButton,
+    #MainMenu,
+    footer {
+        display: none !important;
+    }
+
+    /* Full screen background */
+    [data-testid="stAppViewContainer"] > .main {
+        background: linear-gradient(135deg, #0b0f19 0%, #1a1f2e 50%, #0b0f19 100%) !important;
+        padding: 0 !important;
+    }
+
+    .block-container {
+        display: flex !important;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh !important;
+        padding: 2rem 1rem !important;
+        max-width: 100% !important;
+    }
+
+    /* Hide all extra element containers */
+    .element-container {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .element-container:first-child:not(:has(div)) {
+        display: none !important;
+    }
+
+    /* Ensure login wrapper takes proper width */
+    .element-container:has(.login-wrapper) {
+        width: 100%;
+        max-width: 100%;
         display: flex;
         justify-content: center;
-        align-items: flex-start;
+        align-items: center;
     }
 
-    .auth-container {
-        max-width: 420px;
+    /* Login wrapper */
+    .login-wrapper {
+        max-width: 500px;
         width: 100%;
-        margin: 3rem auto;
-        background: linear-gradient(135deg, #1f2430 0%, #171a22 100%);
-        border: 1px solid rgba(255, 77, 79, 0.2);
-        border-radius: 16px;
-        padding: clamp(24px, 5vw, 40px);
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        animation: slideUp 0.6s ease;
+        margin: 0 auto;
+        padding: 0;
     }
 
-    .auth-title {
+    /* Login card with glassmorphism */
+    .login-card {
+        background: rgba(31, 36, 48, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 77, 79, 0.3);
+        border-radius: 24px;
+        padding: 3rem 2.5rem;
+        box-shadow:
+            0 20px 60px rgba(0, 0, 0, 0.7),
+            0 0 100px rgba(255, 77, 79, 0.15),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+        overflow: visible;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Animated background */
+    .login-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255, 77, 79, 0.12) 0%, transparent 70%);
+        animation: rotate 20s linear infinite;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    @keyframes rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Title section */
+    .login-title {
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 2.5rem;
+        position: relative;
+        z-index: 1;
     }
 
-    .auth-title h2 {
+    .login-title h1 {
         color: #ff4d4f;
-        margin-bottom: 0.5rem;
-    }
-
-    .form-group {
-        margin-bottom: 1.5rem;
-    }
-
-    .form-label {
-        display: block;
+        font-size: clamp(32px, 6vw, 44px);
         margin-bottom: 0.75rem;
-        color: #e5e7eb;
-        font-weight: 500;
-        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        text-shadow: 0 2px 20px rgba(255, 77, 79, 0.4);
+        animation: glow 2s ease-in-out infinite;
     }
 
-    .form-input {
-        width: 100%;
-        padding: 12px 14px;
-        background: #2a2f3a;
-        border: 1px solid rgba(255, 77, 79, 0.2);
-        border-radius: 8px;
-        color: #e5e7eb;
-        font-size: 14px;
-        transition: all 0.3s ease;
+    @keyframes glow {
+        0%, 100% { text-shadow: 0 2px 20px rgba(255, 77, 79, 0.4); }
+        50% { text-shadow: 0 2px 30px rgba(255, 77, 79, 0.6); }
     }
 
-    .form-input:hover {
-        border-color: #ff4d4f;
-        background: #323846;
+    .login-subtitle {
+        color: #cbd5e1;
+        font-size: clamp(14px, 2vw, 16px);
+        margin-top: 0.5rem;
+        font-weight: 400;
+        opacity: 0.95;
+        line-height: 1.5;
     }
 
-    .form-input:focus {
-        outline: none;
-        border-color: #ff4d4f;
-        box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.1);
-    }
-
-    .auth-button {
-        width: 100%;
-        padding: 12px 20px;
-        background: #ff4d4f;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        min-height: 44px;
-    }
-
-    .auth-button:hover {
-        background: #ff6b72;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(255, 77, 79, 0.3);
-    }
-
-    .auth-button:active {
-        transform: translateY(0);
-    }
-
-    .auth-footer {
-        text-align: center;
-        margin-top: 1.5rem;
-        color: #9ca3af;
-        font-size: 13px;
-    }
-
+    /* Slide up animation */
     @keyframes slideUp {
         from {
             opacity: 0;
-            transform: translateY(30px);
+            transform: translateY(40px) scale(0.96);
         }
         to {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    /* Responsive breakpoints */
+    @media (max-width: 768px) {
+        .login-card {
+            padding: 2.5rem 2rem;
+            border-radius: 20px;
+        }
+
+        .login-title {
+            margin-bottom: 2rem;
+        }
+
+        .login-title h1 {
+            font-size: 36px;
         }
     }
 
     @media (max-width: 480px) {
-        .auth-container {
-            margin: 1.5rem auto;
-            padding: 20px;
+        .block-container {
+            padding: 1.5rem 1rem !important;
         }
 
-        .auth-title {
-            margin-bottom: 1.5rem;
+        .login-card {
+            padding: 2rem 1.5rem;
+            border-radius: 18px;
         }
 
-        .form-group {
-            margin-bottom: 1rem;
+        .login-title {
+            margin-bottom: 1.75rem;
+        }
+
+        .login-title h1 {
+            font-size: 30px;
+        }
+
+        .login-subtitle {
+            font-size: 14px;
+        }
+    }
+
+    @media (max-width: 360px) {
+        .login-card {
+            padding: 1.75rem 1.25rem;
+        }
+
+        .login-title h1 {
+            font-size: 26px;
         }
     }
     </style>
-
-    <div class="auth-container">
-        <div class="auth-title">
-            <h2>🔐 Login</h2>
-            <p style="color: #9ca3af; font-size: 14px;">Access your classroom lectures</p>
-        </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        username = st.text_input("Username", placeholder="Enter your username", label_visibility="collapsed")
-        password = st.text_input("Password", type="password", placeholder="Enter your password", label_visibility="collapsed")
-        login_btn = st.button("🚀 Login", use_container_width=True)
+    # Login wrapper
+    st.markdown('<div class="login-wrapper"><div class="login-card">', unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Title
+    st.markdown("""
+    <div class="login-title">
+        <h1>🔐 Login</h1>
+        <p class="login-subtitle">Access your classroom lectures and AI-powered learning</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Enhanced input styling
+    st.markdown("""
+    <style>
+    /* Enhanced login input boxes */
+    div[data-testid="stTextInput"] {
+        position: relative;
+        z-index: 1;
+    }
+
+    div[data-testid="stTextInput"] input {
+        height: 56px !important;
+        font-size: 16px !important;
+        padding: 16px 20px 16px 48px !important;
+        background: rgba(42, 47, 58, 0.9) !important;
+        border: 2px solid rgba(255, 77, 79, 0.2) !important;
+        border-radius: 12px !important;
+        color: #e5e7eb !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        font-weight: 500 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+
+    div[data-testid="stTextInput"] input:hover {
+        border-color: rgba(255, 77, 79, 0.4) !important;
+        background: rgba(50, 56, 70, 0.9) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(255, 77, 79, 0.1) !important;
+    }
+
+    div[data-testid="stTextInput"] input:focus {
+        border-color: #ff4d4f !important;
+        background: rgba(50, 56, 70, 1) !important;
+        box-shadow: 0 0 0 4px rgba(255, 77, 79, 0.12),
+                    0 8px 20px rgba(255, 77, 79, 0.15) !important;
+        transform: translateY(-2px);
+    }
+
+    div[data-testid="stTextInput"] label {
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        margin-bottom: 10px !important;
+        color: #cbd5e1 !important;
+        letter-spacing: 0.3px !important;
+    }
+
+    /* Enhanced login button */
+    div[data-testid="stButton"] {
+        margin-top: 1.5rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    div[data-testid="stButton"] button[kind="primary"] {
+        height: 56px !important;
+        font-size: 17px !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, #ff4d4f 0%, #ff6b72 100%) !important;
+        border: none !important;
+        border-radius: 12px !important;
+        color: white !important;
+        letter-spacing: 0.5px !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 4px 16px rgba(255, 77, 79, 0.3) !important;
+        position: relative;
+        overflow: hidden;
+    }
+
+    div[data-testid="stButton"] button[kind="primary"]::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    div[data-testid="stButton"] button[kind="primary"]:hover::before {
+        left: 100%;
+    }
+
+    div[data-testid="stButton"] button[kind="primary"]:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 8px 24px rgba(255, 77, 79, 0.4) !important;
+        background: linear-gradient(135deg, #ff6b72 0%, #ff4d4f 100%) !important;
+    }
+
+    div[data-testid="stButton"] button[kind="primary"]:active {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3) !important;
+    }
+
+    /* Demo credentials hint */
+    .demo-hint {
+        text-align: center;
+        margin-top: 2rem;
+        padding: 1rem;
+        background: rgba(59, 130, 246, 0.08);
+        border-radius: 10px;
+        border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .demo-hint p {
+        color: #94a3b8;
+        font-size: 13px;
+        margin: 0.25rem 0;
+    }
+
+    .demo-hint strong {
+        color: #60a5fa;
+        font-weight: 600;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Form inputs
+    username = st.text_input("👤 Username", placeholder="Enter your username", key="login_username")
+    password = st.text_input("🔑 Password", type="password", placeholder="Enter your password", key="login_password")
+
+    # Login button
+    login_btn = st.button("🚀 Login to Dashboard", use_container_width=True, type="primary")
+
+    # Demo credentials
+    st.markdown("""
+    <div class="demo-hint">
+        <p><strong>Demo Accounts:</strong></p>
+        <p>Student: <strong>stu1</strong> / <strong>stu123</strong></p>
+        <p>Staff: <strong>staff1</strong> / <strong>staff123</strong></p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('</div></div>', unsafe_allow_html=True)
 
     # ================== AUTH LOGIC ==================
     if login_btn:
@@ -1091,6 +1243,38 @@ st.sidebar.markdown("""
 .sidebar-divider {
     border-top: 1px solid rgba(255, 77, 79, 0.2);
     margin: 1rem 0;
+}
+
+/* Sidebar radio button active state styling */
+div[data-testid="stSidebar"] div[role="radiogroup"] label {
+    background: transparent !important;
+    padding: 12px 16px !important;
+    border-radius: 8px !important;
+    margin-bottom: 8px !important;
+    transition: all 0.3s ease !important;
+    border: 1px solid transparent !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    background: rgba(255, 77, 79, 0.1) !important;
+    border-color: rgba(255, 77, 79, 0.3) !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
+    background: linear-gradient(135deg, rgba(255, 77, 79, 0.2) 0%, rgba(255, 77, 79, 0.1) 100%) !important;
+    border-color: #ff4d4f !important;
+    border-left: 4px solid #ff4d4f !important;
+    padding-left: 12px !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] span {
+    color: #ff4d4f !important;
+    font-weight: 600 !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label span {
+    font-size: 14px !important;
+    color: #e5e7eb !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1240,17 +1424,73 @@ if menu == "📤 Upload Lecture":
 
 # ================== VIEW ==================
 if menu == "📺 View Lectures":
-    st.header("📺 Lecture Viewer")
+    # Add dashboard styling
+    st.markdown("""
+    <style>
+    /* Dashboard header */
+    .dashboard-header {
+        text-align: center;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, rgba(255, 77, 79, 0.1) 0%, rgba(31, 36, 48, 0.5) 100%);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 77, 79, 0.2);
+    }
+
+    .dashboard-header h1 {
+        color: #ff4d4f;
+        font-size: clamp(24px, 5vw, 36px);
+        margin-bottom: 0.5rem;
+        font-weight: 700;
+    }
+
+    /* Selectbox styling improvements */
+    div[data-baseweb="select"] {
+        margin-bottom: 1.5rem !important;
+    }
+
+    /* Video/Audio player container */
+    .element-container iframe,
+    .element-container video,
+    .element-container audio {
+        border-radius: 12px !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+        margin-top: 1.5rem !important;
+    }
+
+    /* Info messages */
+    .stInfo {
+        background: rgba(59, 130, 246, 0.1) !important;
+        border-left-color: #3b82f6 !important;
+        border-radius: 12px !important;
+        padding: 1.5rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Dashboard header
+    st.markdown("""
+    <div class="dashboard-header">
+        <h1>📺 Lecture Viewer</h1>
+        <p style="color: #9ca3af; font-size: clamp(14px, 2vw, 16px);">Browse and watch your classroom lectures</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     subjects = os.listdir(BASE_DIR)
     if not subjects:
-        st.info("No lectures uploaded yet")
+        st.info("📚 No lectures uploaded yet. Staff can upload lectures from the Upload page.")
         st.stop()
 
-    subject = st.selectbox("Select Subject", subjects)
-    unit = st.selectbox("Select Unit", os.listdir(os.path.join(BASE_DIR, subject)))
+    # Selectboxes in columns for better layout
+    col1, col2 = st.columns(2)
+    with col1:
+        subject = st.selectbox("📚 Select Subject", subjects)
+
+    with col2:
+        unit = st.selectbox("📖 Select Unit", os.listdir(os.path.join(BASE_DIR, subject)))
+
     date = st.selectbox(
-        "Select Date",
+        "📅 Select Date",
         os.listdir(os.path.join(BASE_DIR, subject, unit))
     )
 
@@ -1258,8 +1498,10 @@ if menu == "📺 View Lectures":
     lectures = [f for f in os.listdir(date_path) if f.endswith(("mp4", "mp3", "wav"))]
 
     if lectures:
-        lecture = st.selectbox("Select Lecture", lectures)
+        lecture = st.selectbox("🎬 Select Lecture", lectures)
         st.session_state.current_path = os.path.join(date_path, lecture)
+
+        st.divider()
 
         if lecture.endswith(".mp4"):
             st.video(st.session_state.current_path)
@@ -1274,10 +1516,131 @@ def is_greeting(text):
 
 
 if menu == "🤖 AI Chat":
-    st.title("🤖 Classroom AI Chat (Powered by Gemini)")
+    # Add comprehensive chat page styling
+    st.markdown("""
+    <style>
+    /* Chat page specific styling */
+    .chat-header {
+        text-align: center;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, rgba(255, 77, 79, 0.1) 0%, rgba(31, 36, 48, 0.5) 100%);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 77, 79, 0.2);
+    }
+
+    .chat-header h1 {
+        color: #ff4d4f;
+        font-size: clamp(24px, 5vw, 36px);
+        margin-bottom: 0.5rem;
+        font-weight: 700;
+    }
+
+    .chat-header p {
+        color: #9ca3af;
+        font-size: clamp(14px, 2vw, 16px);
+        margin: 0;
+    }
+
+    /* Chat messages styling */
+    .stChatMessage {
+        background: rgba(31, 36, 48, 0.6) !important;
+        border-radius: 12px !important;
+        padding: 16px !important;
+        margin-bottom: 16px !important;
+        border: 1px solid rgba(255, 77, 79, 0.1) !important;
+    }
+
+    /* User messages */
+    .stChatMessage[data-testid="user-message"] {
+        background: rgba(100, 116, 139, 0.2) !important;
+        border-left: 3px solid #64748b !important;
+    }
+
+    /* Assistant messages */
+    .stChatMessage[data-testid="assistant-message"] {
+        background: rgba(255, 77, 79, 0.08) !important;
+        border-left: 3px solid #ff4d4f !important;
+    }
+
+    /* Chat input styling */
+    .stChatInputContainer {
+        background: var(--secondary-color) !important;
+        border-radius: 12px !important;
+        padding: 8px !important;
+        border: 1px solid rgba(255, 77, 79, 0.2) !important;
+        margin-top: 2rem !important;
+    }
+
+    .stChatInputContainer textarea {
+        background: var(--input-bg) !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(255, 77, 79, 0.2) !important;
+        color: var(--text-primary) !important;
+        font-size: 15px !important;
+        padding: 12px !important;
+        min-height: 50px !important;
+    }
+
+    .stChatInputContainer textarea:focus {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.1) !important;
+    }
+
+    /* Source caption styling */
+    .stChatMessage .element-container p {
+        line-height: 1.6;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Empty state message */
+    .chat-empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #9ca3af;
+    }
+
+    .chat-empty-state h3 {
+        color: #ff4d4f;
+        margin-bottom: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .chat-header {
+            padding: 1.5rem 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stChatMessage {
+            padding: 12px !important;
+            margin-bottom: 12px !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Chat header
+    st.markdown("""
+    <div class="chat-header">
+        <h1>🤖 Classroom AI Chat</h1>
+        <p>Powered by Gemini - Ask questions about your lectures or general topics</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
+
+    # Show empty state if no messages
+    if len(st.session_state.messages) == 0:
+        st.markdown("""
+        <div class="chat-empty-state">
+            <h3>💬 Start a Conversation</h3>
+            <p>Ask me anything about your classroom lectures or general knowledge!</p>
+            <p style="margin-top: 1rem; font-size: 14px;">
+                Try: "What is AI?" or "Explain machine learning basics"
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
     # ---- DISPLAY CHAT HISTORY ----
     for msg in st.session_state.messages:
@@ -1360,14 +1723,18 @@ QUESTION:
 st.sidebar.divider()
 if st.sidebar.button("🚪 Logout"):
     # Clear all session state variables
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+    # Re-initialize session state
     st.session_state.logged_in = False
     st.session_state.user = None
     st.session_state.role = None
     st.session_state.page = "home"
-    
-    # Clear query params (keep only page)
+
+    # Clear all query params
     st.query_params.clear()
     st.query_params["page"] = "home"
-    
+
     # Rerun to show login page
     st.rerun()

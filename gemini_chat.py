@@ -1,7 +1,5 @@
 from gemini_config import client
 
-MODEL_NAME = "gemini-2.5-flash-lite"
-
 def gemini_chat(question, lecture_context=None):
     """
     Works with:
@@ -39,9 +37,6 @@ Answer format:
         prompt = question
 
     # Call Gemini
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt
-    )
+    response = client.generate_content(prompt)
 
     return response.text.strip()
