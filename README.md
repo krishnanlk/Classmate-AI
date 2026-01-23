@@ -6,11 +6,14 @@ An intelligent AI-powered educational assistant that leverages Google Gemini API
 
 - **AI-Powered Chat**: Interactive chat interface powered by Google Gemini API
 - **Lecture Management**: Organize and manage course lectures by subject and unit
-- **Chat History**: Persistent chat history per user with JSON storage
-- **Semantic Search**: TF-IDF based content similarity matching
+- **Document Upload**: Upload PDF and Word documents to ask questions about their content
+- **Smart Q&A**: Ask questions about lectures, uploaded documents, or general knowledge
+- **Semantic Search**: TF-IDF based content similarity matching across lecture materials
 - **Multi-Subject Support**: Handle multiple courses (AI, DAA, DBMS, etc.)
 - **Cloud Storage Integration**: Structured cloud storage for organized content management
-- **Responsive UI**: Built with Streamlit for seamless user experience
+- **Downloadable Notes**: Generate lecture notes as PDF or Word documents
+- **Multi-User Support**: Separate profiles for students and staff with role-based features
+- **Responsive UI**: Clean, modern interface built with Streamlit for seamless user experience
 
 ## 📋 Prerequisites
 
@@ -62,14 +65,19 @@ pip install -r requirements.txt
 ```
 
 **Dependency Overview:**
-- `streamlit`: Web framework for the UI
+- `streamlit` (1.51.0+): Web framework for the UI
+- `google-generativeai` (0.8.6+): Google Gemini API integration
 - `openai-whisper`: Speech-to-text processing
 - `torch`: Deep learning framework for ML models
 - `transformers`: Pre-trained model library
 - `pytube`: YouTube video downloading
 - `ffmpeg-python`: Audio/video processing
-- `scikit-learn`: Machine learning utilities for similarity matching
+- `scikit-learn`: Machine learning utilities for similarity matching and TF-IDF vectorization
+- `reportlab` (4.4.9+): PDF document generation with professional styling
+- `python-docx` (1.2.0+): Word document (.docx) creation and manipulation
+- `PyPDF2` (3.0.1+): PDF text extraction and processing
 - `numpy`: Numerical computing library
+- `wikipedia`: External knowledge base for general questions
 
 ### Step 4: Configure Environment Variables
 
@@ -117,34 +125,35 @@ The application will be accessible at: **http://localhost:8501**
 
 ```
 Classmate-AI/
-├── app.py                    # Main Streamlit application
-├── gemini_chat.py           # Gemini API integration & chat logic
-├── gemini_config.py         # Configuration for Gemini settings
-├── connect.py               # Database/lecture connection utilities
-├── test_gemini.py           # Unit tests for Gemini functionality
-├── requirements.txt         # Python dependencies
-├── gemini.env              # Environment variable template
-├── users.json              # User data storage
+├── app.py                      # Main Streamlit application
+├── gemini_chat.py              # Gemini API integration & chat logic
+├── gemini_config.py            # Configuration for Gemini settings
+├── connect.py                  # Database/lecture connection utilities
+├── document_extractor.py       # PDF/Word document text extraction
+├── notes_generator.py          # PDF/Word lecture notes generation
+├── test_gemini.py              # Unit tests for Gemini functionality
+├── requirements.txt            # Python dependencies
+├── gemini.env                  # Environment variable template
+├── users.json                  # User data storage
 │
-├── chat_history/           # User chat persistence
-│   ├── default_user.json
-│   └── staff1.json
-│
-├── cloud_storage/          # Organized content storage
+├── cloud_storage/              # Organized content storage
 │   ├── AI/
-│   │   └── UNIT_1/
-│   │       └── 2026-01-14/
-│   │           └── AI_UNIT_1_Sample_topic_01-25PM.txt
+│   │   ├── Unit_1/
+│   │   │   └── 2026-01-07/
+│   │   │       └── AI__Unit_1_YouTube_tutorial_video_00-59.txt
+│   │   └── ...
 │   ├── DAA/
-│   │   └── Unit-1/
-│   │       └── 2026-01-14/
-│   │           └── DAA_Unit-1_Alogorithm__12-56PM.txt
-│   ├── DBMS/
-│   │   └── UNIT_2/
-│   └── Test/
+│   │   ├── unit_1/
+│   │   │   └── 2026-01-16/
+│   │   │       └── DAA_unit_1_Time_Complexities_in_Algorithms__00-41.txt
+│   │   └── ...
+│   └── DBMS/
+│       ├── unit_1/
+│       └── ...
 │
-├── lectures/               # Additional lecture materials
-└── README.md              # This file
+├── lectures/                   # Additional lecture materials
+├── .gitignore                  # Git ignore rules
+└── README.md                   # This file
 ```
 
 ## ⚙️ Configuration Details
@@ -152,58 +161,86 @@ Classmate-AI/
 ### app.py Configuration
 
 The main application handles:
-- **Page Layout**: Set to wide layout for better UI
-- **Storage Paths**: `cloud_storage/` and `chat_history/` directories
-- **Chat Persistence**: Automatic save/load of user conversations
-- **User Management**: User IDs for personalized experiences
+- **Page Layout**: Wide layout optimized for desktop viewing
+- **Storage Paths**: `cloud_storage/` for lecture materials
+- **User Management**: Separate student and staff roles with different features
+- **File Upload**: Support for PDF and Word document uploads
+- **Document Processing**: Automatic text extraction from uploaded files
+- **Lecture-Aware Q&A**: Context-aware answers using lecture content
+- **Notes Generation**: Create downloadable PDF and Word documents from lectures
 
 ### gemini_config.py
 
 Configure Gemini API settings:
 ```python
-# Example configuration structure
+# Default configuration
 GEMINI_MODEL = "gemini-pro"
 MAX_TOKENS = 2048
 TEMPERATURE = 0.7
 TOP_P = 0.9
 ```
 
-### Environment Setup
+### document_extractor.py
 
-Key environment variables:
-```env
-GEMINI_API_KEY=your_api_key           # Required for API calls
-STREAMLIT_SERVER_PORT=8501            # Optional: custom port
-STREAMLIT_LOGGER_LEVEL=info           # Optional: logging level
+Handles document processing:
+- **PDF Extraction**: Uses PyPDF2 to extract text from PDF files
+- **Word Extraction**: Uses python-docx to extract content from .docx files
+- **Page Tracking**: Maintains information about which page content came from
+
+### notes_generator.py
+
+Generates downloadable study materials:
+- **PDF Notes**: Professional formatted PDF documents with key concepts
+- **Word Notes**: Editable Word documents for student note-taking
+- **Key Point Extraction**: Uses Gemini AI to identify important concepts from lectures
+
+## 📊 Features in Detail
+
+### Chat Interface (Students Only)
+
+The chat interface provides:
+- **Simple, Clean Design**: Minimalist interface for focused learning
+- **Document Upload**: Attach PDF or Word files using the "Attach File" button
+- **Context-Aware Responses**: Answers based on lectures, uploaded documents, or general knowledge
+- **Source Attribution**: Clearly shows where answers come from (📘 Classroom Lectures, 📄 Uploaded Document, 🌐 General Knowledge)
+
+### Lecture Viewer
+
+Browse and study your course materials:
+- **Subject-Based Organization**: Find lectures by course (AI, DAA, DBMS, etc.)
+- **Unit Navigation**: Access specific units and topics
+- **Searchable Content**: Use semantic search to find relevant lecture materials
+- **Download Notes**: Generate and download lecture notes as PDF or Word documents
+
+### Role-Based Features
+
+**Students Can:**
+- ✅ View lectures by subject and unit
+- ✅ Chat with AI about lecture content
+- ✅ Upload documents to ask questions
+- ✅ Download lecture notes as PDF/Word
+
+**Staff Can:**
+- ✅ Upload new lectures to the system
+- ✅ Manage course content
+- ✅ All student features
+
+### Storage Structure
+
+Lectures are organized in `cloud_storage/`:
+```
+cloud_storage/
+├── [SUBJECT]/
+│   ├── [UNIT]/
+│   │   └── [DATE]/
+│   │       └── [lecture_file].txt
 ```
 
-## 📊 Database/Storage
-
-### Chat History Format
-
-Chat histories are stored as JSON files in `chat_history/`:
-
-```json
-[
-  {
-    "role": "user",
-    "content": "What is machine learning?",
-    "timestamp": "2026-01-20T10:30:00"
-  },
-  {
-    "role": "assistant",
-    "content": "Machine learning is...",
-    "timestamp": "2026-01-20T10:30:05"
-  }
-]
+Example:
 ```
-
-### Cloud Storage Organization
-
-Content is organized by:
-- **Subject**: AI, DAA, DBMS, Test, etc.
-- **Unit/Chapter**: UNIT_1, Unit-1, UNIT_2, etc.
-- **Date**: Organized by date of creation (YYYY-MM-DD)
+cloud_storage/AI/Unit_1/2026-01-07/AI__Unit_1_YouTube_tutorial_video_00-59.txt
+cloud_storage/DAA/unit_1/2026-01-16/DAA_unit_1_Time_Complexities_in_Algorithms__00-41.txt
+```
 
 ## 🔧 Advanced Configuration
 
@@ -271,19 +308,69 @@ cat .env  # Verify content
 streamlit run app.py --server.port 8080
 ```
 
-## 📝 Usage Examples
+## 📝 Usage Guide
 
-### Starting a Chat Session
+### For Students
 
-1. Launch the application: `streamlit run app.py`
-2. Enter your user ID in the sidebar
-3. Begin typing your questions about courses
-
-### Managing Lectures
-
-Lectures should be stored in the `cloud_storage/` directory with the structure:
+#### 1. Starting the Application
+```bash
+streamlit run app.py
 ```
-cloud_storage/[SUBJECT]/[UNIT]/[DATE]/[content_file]
+Then access at `http://localhost:8501`
+
+#### 2. Login/Authentication
+- Enter your user ID in the sidebar
+- Select "Student" role
+- Click "Enter Chat" or "View Lectures"
+
+#### 3. Reading Lectures
+1. Click **📺 View Lectures** in the top menu
+2. Select a subject from the dropdown
+3. Choose a unit to explore
+4. View lecture content and text
+5. **Download Notes**: Click "📥 Download as PDF" or "📄 Download as Word" for study materials
+
+#### 4. Asking Questions via Chat
+1. Click **🤖 AI Chat** in the top menu
+2. Type your question about:
+   - Lecture content (if lecture is loaded)
+   - Uploaded documents
+   - General knowledge topics
+3. Optional: Click **Attach File** to upload a PDF or Word document
+4. Press Enter to get AI-generated answers with source attribution
+
+#### 5. Document-Based Q&A
+1. In the chat interface, click **Attach File**
+2. Upload a PDF or Word document
+3. Ask questions about the document content
+4. AI will extract and search the document for relevant answers
+
+### Example Workflows
+
+**Workflow 1: Study with Lecture Notes**
+```
+1. Open Lecture Viewer
+2. Select AI > Unit 1 > 2026-01-07
+3. Read AI__Unit_1_YouTube_tutorial_video_00-59.txt
+4. Click "Download as PDF" to get study notes
+```
+
+**Workflow 2: Ask Questions About Lecture**
+```
+1. Open AI Chat
+2. Ask: "What are the key concepts in machine learning?"
+3. AI searches lectures and provides context-aware answer
+4. See source: "📘 Classroom Lectures"
+```
+
+**Workflow 3: Study External Material**
+```
+1. Open AI Chat
+2. Click "Attach File"
+3. Upload your research paper (PDF)
+4. Ask: "Summarize the main findings"
+5. AI extracts from document and summarizes
+6. See source: "📄 [document_name]"
 ```
 
 ## 🤝 Contributing
@@ -313,25 +400,69 @@ For issues, questions, or suggestions:
 
 ## 🔒 Security Notes
 
-- **Never commit `.env` files** with real API keys
-- Keep `gemini.env` updated with API key template only
-- Use environment variables for sensitive data in production
-- Regularly rotate API keys
-- Monitor API usage to detect unauthorized access
+- **Never commit `.env` files** with real API keys to version control
+- Keep `gemini.env` as template only - never upload with actual keys
+- Use environment variables for all sensitive data in production
+- Regularly rotate API keys to prevent unauthorized access
+- Monitor API usage to detect anomalies
+- Excluded files (in .gitignore):
+  - Environment files: `.env`, `*.env`, `gemini.env`
+  - Python cache: `__pycache__/`, `*.pyc`, `*.pyo`
+  - Virtual environments: `venv/`, `env/`
+  - IDE configs: `.vscode/`, `.idea/`
+  - Build artifacts: `dist/`, `build/`, `*.egg-info`
 
 ## 🎓 Educational Purpose
 
-Classmate-AI is designed to enhance student learning through AI assistance. Use responsibly and supplement traditional learning methods.
+Classmate-AI is designed to enhance student learning through AI assistance. Features include:
+- Independent learning support
+- Study material generation
+- Homework assistance
+- Concept clarification
+- Document analysis
+
+**Note**: This tool is intended for students only. Features are restricted by role-based access control.
 
 ## 📈 Roadmap
 
-- [ ] Multi-language support
+- [ ] **Lecture-Aware Quiz Generator** - Auto-generate MCQs, Short Answer, and True/False questions from lectures (Students only)
+- [ ] Advanced analytics dashboard for learning progress tracking
+- [ ] Multi-language support for international students
 - [ ] Voice input/output capabilities
-- [ ] Advanced analytics dashboard
 - [ ] Mobile app version
-- [ ] Offline mode support
-- [ ] Custom model fine-tuning
+- [ ] Offline mode support for lectures
+- [ ] Custom model fine-tuning for specific domains
+- [ ] Collaborative study features for group learning
+- [ ] Real-time assignment feedback and grading
+- [ ] Integration with learning management systems (LMS)
+
+## 🔄 Recent Updates (January 2026)
+
+### Version 1.1.0 - Simplified Student Interface
+
+**New Features:**
+- ✨ **Document Upload**: Upload PDF and Word documents to ask questions about their content
+- 📝 **Lecture Notes Generator**: Download lectures as PDF or Word documents
+- 📎 **File Attachment Button**: Clean, simple file upload interface in chat
+- 🎯 **Smart Context Integration**: AI answers combine lecture content, uploaded documents, and general knowledge
+- 📊 **Source Attribution**: Clear indication of where each answer came from
+
+**UI/UX Improvements:**
+- 🎨 Simplified chat interface focused on student learning
+- ❌ Removed chat history sidebar for cleaner appearance
+- 📌 Made attach file button prominently visible
+- 🚀 Faster, more responsive interactions
+
+**Code Quality:**
+- 🔍 Improved error handling for document processing
+- 📦 Enhanced document extraction for PDF and Word formats
+- 🎯 Better semantic search across lecture materials
+- 🔐 Updated .gitignore with comprehensive exclusion rules
 
 ---
 
-**Last Updated**: January 2026 | **Version**: 1.0.0
+**Last Updated**: January 23, 2026  
+**Current Version**: 1.1.0  
+**Author**: Krishnan LK  
+**Repository**: [krishnanlk/Classmate-AI](https://github.com/krishnanlk/Classmate-AI)  
+**Status**: ✅ Active Development
