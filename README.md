@@ -325,12 +325,8 @@ Classmate-AI is designed to enhance student learning through AI assistance. Use 
 
 ## 📈 Roadmap
 
-- [ ] Multi-language support
 - [ ] Voice input/output capabilities
 - [ ] Advanced analytics dashboard
-- [ ] Mobile app version
-- [ ] Offline mode support
-- [ ] Custom model fine-tuning
 
 ---
 
