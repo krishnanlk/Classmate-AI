@@ -8,6 +8,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import wikipedia
 from gemini_chat import gemini_chat
 from connect import load_all_lectures
+from notes_generator import generate_notes_pdf, generate_notes_word
+from document_extractor import extract_text_from_document
 
 # ================== PAGE CONFIG ==================
 st.set_page_config(
@@ -45,7 +47,7 @@ st.markdown("""
 :root {
     --primary-color: #ff4d4f;
     --secondary-color: #1f2430;
-    --bg-dark: #0b0f19;
+    --bg-dark: #0b0f18;
     --bg-darker: #000000;
     --text-primary: #e5e7eb;
     --text-secondary: #9ca3af;
@@ -827,14 +829,14 @@ if not st.session_state.logged_in and st.session_state.page == "home":
 
     <div class="features-grid">
         <div class="feature-card">
-            <div class="feature-icon">🎥</div>
+            <div class="feature-icon">🎤</div>
             <h3>Auto Lecture Recording</h3>
-            <p>Automatically capture and store lectures for future reference with crystal-clear quality.</p>
+            <p>Automatically Record audio and store lectures for future reference with crystal-clear quality.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon">☁️</div>
-            <h3>Secure Cloud Storage</h3>
-            <p>Your lectures are safely stored in the cloud for 7–14 days with encrypted access.</p>
+            <h3>Secure Storage</h3>
+            <p>Your lectures are safely stored in the local server for No.of.Days days with encrypted access.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon">🧠</div>
@@ -843,8 +845,8 @@ if not st.session_state.logged_in and st.session_state.page == "home":
         </div>
         <div class="feature-card">
             <div class="feature-icon">💬</div>
-            <h3>Subject-wise Chatbot</h3>
-            <p>Ask questions and get instant answers from your classroom content.</p>
+            <h3>Personal Chatbot</h3>
+            <p>Ask questions and get instant answers directly from your classroom content with the help of Gemini AI.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon">🔐</div>
@@ -860,369 +862,146 @@ if not st.session_state.logged_in and st.session_state.page == "home":
     """, unsafe_allow_html=True)
 
     st.stop()
-
-# ================== LOGIN PAGE ==================
+## ======================login page===================##
 if not st.session_state.logged_in and st.session_state.page == "auth":
 
     st.markdown("""
     <style>
-    /* Hide all Streamlit default elements on login page */
-    [data-testid="stHeader"],
-    [data-testid="stDecoration"],
-    [data-testid="stToolbar"],
-    .stDeployButton,
-    #MainMenu,
-    footer {
-        display: none !important;
-    }
+    header, footer, #MainMenu {display:none;}
 
-    /* Full screen background */
     [data-testid="stAppViewContainer"] > .main {
-        background: linear-gradient(135deg, #0b0f19 0%, #1a1f2e 50%, #0b0f19 100%) !important;
-        padding: 0 !important;
-    }
-
-    .block-container {
-        display: flex !important;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh !important;
-        padding: 2rem 1rem !important;
-        max-width: 100% !important;
-    }
-
-    /* Hide all extra element containers */
-    .element-container {
-        width: 100%;
-        max-width: 100%;
-    }
-
-    .element-container:first-child:not(:has(div)) {
-        display: none !important;
-    }
-
-    /* Ensure login wrapper takes proper width */
-    .element-container:has(.login-wrapper) {
-        width: 100%;
-        max-width: 100%;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, #0b0f19, #02040a);
         display: flex;
         justify-content: center;
         align-items: center;
-    }
-
-    /* Login wrapper */
-    .login-wrapper {
-        max-width: 500px;
-        width: 100%;
-        margin: 0 auto;
         padding: 0;
-    }
-
-    /* Login card with glassmorphism */
-    .login-card {
-        background: rgba(31, 36, 48, 0.9);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 77, 79, 0.3);
-        border-radius: 24px;
-        padding: 3rem 2.5rem;
-        box-shadow:
-            0 20px 60px rgba(0, 0, 0, 0.7),
-            0 0 100px rgba(255, 77, 79, 0.15),
-            inset 0 1px 0 rgba(255, 255, 255, 0.05);
-        animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-        position: relative;
-        overflow: visible;
-        width: 100%;
-        box-sizing: border-box;
-    }
-
-    /* Animated background */
-    .login-card::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, rgba(255, 77, 79, 0.12) 0%, transparent 70%);
-        animation: rotate 20s linear infinite;
-        pointer-events: none;
-        z-index: 0;
-    }
-
-    @keyframes rotate {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    /* Title section */
-    .login-title {
-        text-align: center;
-        margin-bottom: 2.5rem;
-        position: relative;
-        z-index: 1;
-    }
-
-    .login-title h1 {
-        color: #ff4d4f;
-        font-size: clamp(32px, 6vw, 44px);
-        margin-bottom: 0.75rem;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        text-shadow: 0 2px 20px rgba(255, 77, 79, 0.4);
-        animation: glow 2s ease-in-out infinite;
-    }
-
-    @keyframes glow {
-        0%, 100% { text-shadow: 0 2px 20px rgba(255, 77, 79, 0.4); }
-        50% { text-shadow: 0 2px 30px rgba(255, 77, 79, 0.6); }
-    }
-
-    .login-subtitle {
-        color: #cbd5e1;
-        font-size: clamp(14px, 2vw, 16px);
-        margin-top: 0.5rem;
-        font-weight: 400;
-        opacity: 0.95;
-        line-height: 1.5;
-    }
-
-    /* Slide up animation */
-    @keyframes slideUp {
-        from {
-            opacity: 0;
-            transform: translateY(40px) scale(0.96);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-    }
-
-    /* Responsive breakpoints */
-    @media (max-width: 768px) {
-        .login-card {
-            padding: 2.5rem 2rem;
-            border-radius: 20px;
-        }
-
-        .login-title {
-            margin-bottom: 2rem;
-        }
-
-        .login-title h1 {
-            font-size: 36px;
-        }
-    }
-
-    @media (max-width: 480px) {
         .block-container {
-            padding: 1.5rem 1rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
         }
 
-        .login-card {
-            padding: 2rem 1.5rem;
-            border-radius: 18px;
-        }
-
-        .login-title {
-            margin-bottom: 1.75rem;
-        }
-
-        .login-title h1 {
-            font-size: 30px;
-        }
-
-        .login-subtitle {
-            font-size: 14px;
-        }
     }
 
-    @media (max-width: 360px) {
-        .login-card {
-            padding: 1.75rem 1.25rem;
-        }
-
-        .login-title h1 {
-            font-size: 26px;
-        }
+    .block-container {
+        max-width: 1100px !important;
+        padding: 0 !important;
     }
-    </style>
-    """, unsafe_allow_html=True)
 
-    # Login wrapper
-    st.markdown('<div class="login-wrapper"><div class="login-card">', unsafe_allow_html=True)
+    /* RED WRAPPER */
+    .block-container {
+        max-width: 720px !important;
+        padding: 36px !important;
+        background: linear-gradient(135deg, #0f172a, #020617);
+        border-radius: 28px;
+        box-shadow: 0 40px 120px rgba(255,77,79,0.6);
+    }
 
-    # Title
-    st.markdown("""
-    <div class="login-title">
-        <h1>🔐 Login</h1>
-        <p class="login-subtitle">Access your classroom lectures and AI-powered learning</p>
-    </div>
-    """, unsafe_allow_html=True)
+    .inner-card {
+        background: #0b0f19;
+        border-radius: 22px;
+        padding: 40px 48px;
+        color: white;
+    }
 
-    # Enhanced input styling
-    st.markdown("""
-    <style>
-    /* Enhanced login input boxes */
-    div[data-testid="stTextInput"] {
-        position: relative;
-        z-index: 1;
+    }
+
+    /* DARK INNER CARD */
+    .inner-card {
+        background: #0b0f19;
+        border-radius: 22px;
+        padding: 40px 48px;
+        color: white;
+    }
+
+    .title {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .title h1 {
+        color: #ff4d4f;
+        font-size: 38px;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+
+    .title p {
+        color: #cbd5e1;
+        font-size: 14px;
     }
 
     div[data-testid="stTextInput"] input {
-        height: 56px !important;
-        font-size: 16px !important;
-        padding: 16px 20px 16px 48px !important;
-        background: rgba(42, 47, 58, 0.9) !important;
-        border: 2px solid rgba(255, 77, 79, 0.2) !important;
-        border-radius: 12px !important;
-        color: #e5e7eb !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        font-weight: 500 !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-        max-width: 100% !important;
+        height: 50px;
+        background: #1f2430;
+        border-radius: 12px;
+        border: 2px solid rgba(255,77,79,0.35);
+        color: white;
     }
 
-    div[data-testid="stTextInput"] input:hover {
-        border-color: rgba(255, 77, 79, 0.4) !important;
-        background: rgba(50, 56, 70, 0.9) !important;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(255, 77, 79, 0.1) !important;
+    div[data-testid="stButton"] button {
+        height: 52px;
+        font-weight: 700;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #0f172a, #020617);
+        box-shadow: 0 10px 30px rgba(255,77,79,0.5);
     }
 
-    div[data-testid="stTextInput"] input:focus {
-        border-color: #ff4d4f !important;
-        background: rgba(50, 56, 70, 1) !important;
-        box-shadow: 0 0 0 4px rgba(255, 77, 79, 0.12),
-                    0 8px 20px rgba(255, 77, 79, 0.15) !important;
-        transform: translateY(-2px);
-    }
-
-    div[data-testid="stTextInput"] label {
-        font-size: 15px !important;
-        font-weight: 600 !important;
-        margin-bottom: 10px !important;
-        color: #cbd5e1 !important;
-        letter-spacing: 0.3px !important;
-    }
-
-    /* Enhanced login button */
-    div[data-testid="stButton"] {
-        margin-top: 1.5rem;
-        position: relative;
-        z-index: 1;
-    }
-
-    div[data-testid="stButton"] button[kind="primary"] {
-        height: 56px !important;
-        font-size: 17px !important;
-        font-weight: 700 !important;
-        background: linear-gradient(135deg, #ff4d4f 0%, #ff6b72 100%) !important;
-        border: none !important;
-        border-radius: 12px !important;
-        color: white !important;
-        letter-spacing: 0.5px !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 4px 16px rgba(255, 77, 79, 0.3) !important;
-        position: relative;
-        overflow: hidden;
-    }
-
-    div[data-testid="stButton"] button[kind="primary"]::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-        transition: left 0.5s;
-    }
-
-    div[data-testid="stButton"] button[kind="primary"]:hover::before {
-        left: 100%;
-    }
-
-    div[data-testid="stButton"] button[kind="primary"]:hover {
-        transform: translateY(-3px) !important;
-        box-shadow: 0 8px 24px rgba(255, 77, 79, 0.4) !important;
-        background: linear-gradient(135deg, #ff6b72 0%, #ff4d4f 100%) !important;
-    }
-
-    div[data-testid="stButton"] button[kind="primary"]:active {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3) !important;
-    }
-
-    /* Demo credentials hint */
-    .demo-hint {
+    .demo {
+        margin-top: 28px;
+        padding: 18px;
+        border-radius: 14px;
+        background: rgba(59,130,246,0.12);
+        border: 1px solid rgba(59,130,246,0.3);
         text-align: center;
-        margin-top: 2rem;
-        padding: 1rem;
-        background: rgba(59, 130, 246, 0.08);
-        border-radius: 10px;
-        border: 1px solid rgba(59, 130, 246, 0.2);
-    }
-
-    .demo-hint p {
-        color: #94a3b8;
         font-size: 13px;
-        margin: 0.25rem 0;
-    }
-
-    .demo-hint strong {
-        color: #60a5fa;
-        font-weight: 600;
+        color: #cbd5e1;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # Form inputs
-    username = st.text_input("👤 Username", placeholder="Enter your username", key="login_username")
-    password = st.text_input("🔑 Password", type="password", placeholder="Enter your password", key="login_password")
+    # ===== STRUCTURE THAT ACTUALLY WORKS =====
+    with st.container():
+        st.markdown('<div class="red-shell"><div class="inner-card">', unsafe_allow_html=True)
 
-    # Login button
-    login_btn = st.button("🚀 Login to Dashboard", use_container_width=True, type="primary")
+        st.markdown("""
+        <div class="title">
+            <h1>🔐 Login</h1>
+            <p>Access your classroom lectures and AI-powered learning</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Demo credentials
-    st.markdown("""
-    <div class="demo-hint">
-        <p><strong>Demo Accounts:</strong></p>
-        <p>Student: <strong>stu1</strong> / <strong>stu123</strong></p>
-        <p>Staff: <strong>staff1</strong> / <strong>staff123</strong></p>
-    </div>
-    """, unsafe_allow_html=True)
+        username = st.text_input("👤 Username", placeholder="Enter your username")
+        password = st.text_input("🔑 Password", type="password", placeholder="Enter your password")
 
-    st.markdown('</div></div>', unsafe_allow_html=True)
+        login = st.button("🚀 Login to Dashboard", use_container_width=True)
 
-    # ================== AUTH LOGIC ==================
-    if login_btn:
-        with open("users.json") as f:
-            users = json.load(f)
+        st.markdown("""
+        <div class="demo">
+            <b>Demo Accounts</b><br><br>
+            Student: <b>stu1</b> / <b>stu123</b><br>
+            Staff: <b>staff1</b> / <b>staff123</b>
+        </div>
+        """, unsafe_allow_html=True)
 
-        if username in users and users[username]["password"] == password:
-            st.session_state.logged_in = True
-            st.session_state.user = username
-            st.session_state.role = users[username]["role"]
-            
-            # Store session in URL query params for persistence across page navigation
-            st.query_params["user"] = username
-            st.query_params["role"] = users[username]["role"]
-            st.query_params["page"] = "dashboard"
-            
-            st.success("✅ Login successful! Redirecting...")
-            st.rerun()
-        else:
-            st.error("❌ Invalid credentials. Please try again.")
+        st.markdown('</div></div>', unsafe_allow_html=True)
+
+        if login:
+            with open("users.json") as f:
+                users = json.load(f)
+
+            if username in users and users[username]["password"] == password:
+                st.session_state.logged_in = True
+                st.session_state.user = username
+                st.session_state.role = users[username]["role"]
+                st.query_params["user"] = username
+                st.query_params["role"] = users[username]["role"]
+                st.query_params["page"] = "dashboard"
+                st.rerun()
+            else:
+                st.error("❌ Invalid credentials")
 
     st.stop()
-
-
-
 # ================== SIDEBAR ==================
 st.sidebar.markdown("""
 <style>
@@ -1292,6 +1071,156 @@ if not st.session_state.logged_in:
 # ================== UTIL ==================
 def clean_text(text):
     return re.sub(r"[^\w\s-]", "", text).replace(" ", "_")
+
+# ================== NOTES GENERATION ==================
+def generate_key_notes(lecture_title, lecture_subject, lecture_transcript):
+    """
+    Generate key notes from lecture transcript using Gemini AI.
+    
+    Args:
+        lecture_title (str): Title of the lecture
+        lecture_subject (str): Subject name
+        lecture_transcript (str): The lecture transcript/content
+    
+    Returns:
+        str: Key notes formatted for PDF/Word export
+    """
+    if not lecture_transcript or len(lecture_transcript.strip()) < 100:
+        return "No sufficient lecture content available to generate notes."
+    
+    prompt = f"""
+You are an expert note-taking assistant. Extract the KEY IMPORTANT POINTS from the following lecture content.
+
+LECTURE SUBJECT: {lecture_subject}
+LECTURE TITLE: {lecture_title}
+
+LECTURE CONTENT:
+{lecture_transcript}
+
+Please provide:
+1. A brief summary (2-3 sentences)
+2. Key concepts and definitions (as bullet points)
+3. Important formulas or equations (if any)
+4. Key takeaways (main points to remember)
+
+Format the output clearly with headers and bullet points. Make it concise but comprehensive.
+"""
+    
+    notes = gemini_chat(prompt)
+    return notes
+
+# ================== CHAT HISTORY MANAGEMENT ==================
+def get_chat_history_path(user_id):
+    """Get the directory path for storing user chat histories."""
+    chat_history_dir = os.path.join(CHAT_DIR, user_id, "conversations")
+    os.makedirs(chat_history_dir, exist_ok=True)
+    return chat_history_dir
+
+def save_chat_conversation(user_id, conversation_id, messages, title=None):
+    """
+    Save a conversation to a JSON file.
+    
+    Args:
+        user_id: User identifier
+        conversation_id: Unique ID for the conversation
+        messages: List of message dictionaries
+        title: Optional title for the conversation
+    """
+    chat_dir = get_chat_history_path(user_id)
+    conversation_file = os.path.join(chat_dir, f"{conversation_id}.json")
+    
+    # Create default title from first message if not provided
+    if not title and messages:
+        first_msg = messages[0].get("content", "Untitled")[:50]
+        title = first_msg
+    
+    conversation_data = {
+        "id": conversation_id,
+        "title": title or "Untitled Conversation",
+        "created_at": datetime.now().isoformat(),
+        "last_modified": datetime.now().isoformat(),
+        "messages": messages
+    }
+    
+    with open(conversation_file, "w", encoding="utf-8") as f:
+        json.dump(conversation_data, f, indent=2, ensure_ascii=False)
+
+def load_chat_conversation(user_id, conversation_id):
+    """
+    Load a conversation from a JSON file.
+    
+    Args:
+        user_id: User identifier
+        conversation_id: Unique ID for the conversation
+    
+    Returns:
+        dict: Conversation data or None if not found
+    """
+    chat_dir = get_chat_history_path(user_id)
+    conversation_file = os.path.join(chat_dir, f"{conversation_id}.json")
+    
+    if os.path.exists(conversation_file):
+        with open(conversation_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+def list_chat_conversations(user_id):
+    """
+    List all conversations for a user.
+    
+    Args:
+        user_id: User identifier
+    
+    Returns:
+        list: List of conversation metadata sorted by most recent first
+    """
+    chat_dir = get_chat_history_path(user_id)
+    conversations = []
+    
+    if os.path.exists(chat_dir):
+        for filename in os.listdir(chat_dir):
+            if filename.endswith(".json"):
+                file_path = os.path.join(chat_dir, filename)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    conversations.append({
+                        "id": data.get("id"),
+                        "title": data.get("title", "Untitled"),
+                        "created_at": data.get("created_at"),
+                        "last_modified": data.get("last_modified", data.get("created_at"))
+                    })
+    
+    # Sort by last_modified descending (most recent first)
+    conversations.sort(key=lambda x: x.get("last_modified", ""), reverse=True)
+    return conversations
+
+def delete_chat_conversation(user_id, conversation_id):
+    """
+    Delete a conversation.
+    
+    Args:
+        user_id: User identifier
+        conversation_id: Unique ID for the conversation
+    """
+    chat_dir = get_chat_history_path(user_id)
+    conversation_file = os.path.join(chat_dir, f"{conversation_id}.json")
+    
+    if os.path.exists(conversation_file):
+        os.remove(conversation_file)
+
+def generate_conversation_id():
+    """Generate a unique conversation ID based on timestamp."""
+    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
+
+# ================== INITIALIZE CHAT SESSION ==================
+if "page" in st.session_state and st.session_state.page == "chat":
+    # Initialize chat session state variables if not already done
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "document_context" not in st.session_state:
+        st.session_state.document_context = None
+    if "document_name" not in st.session_state:
+        st.session_state.document_name = None
 
 # ================== MENU ==================
 menu_items = ["📺 View Lectures", "🤖 AI Chat"]
@@ -1507,15 +1436,152 @@ if menu == "📺 View Lectures":
             st.video(st.session_state.current_path)
         else:
             st.audio(st.session_state.current_path)
+        
+        # ================== NOTES DOWNLOAD SECTION ==================
+        st.markdown("""
+        <style>
+        .notes-section {
+            background: linear-gradient(135deg, rgba(255, 77, 79, 0.08) 0%, rgba(31, 36, 48, 0.4) 100%);
+            border: 1px solid rgba(255, 77, 79, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .notes-section h3 {
+            color: #ff4d4f;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .notes-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .notes-buttons {
+                flex-direction: column;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="notes-section">
+            <h3>📝 Download Lecture Notes</h3>
+            <p style="color: #9ca3af; margin-bottom: 1rem; font-size: 14px;">
+                Generate and download important notes from this lecture as PDF or Word document
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_notes1, col_notes2 = st.columns(2)
+        
+        with col_notes1:
+            if st.button("📄 Download as PDF", use_container_width=True, key="download_pdf"):
+                with st.spinner("⏳ Generating PDF notes..."):
+                    try:
+                        # Load lecture transcript
+                        transcript_path = st.session_state.current_path.rsplit(".", 1)[0] + ".txt"
+                        if os.path.exists(transcript_path):
+                            with open(transcript_path, "r", encoding="utf-8") as f:
+                                transcript = f.read()
+                        else:
+                            transcript = "Lecture content not available. Please check the transcript file."
+                        
+                        # Generate key notes using Gemini AI
+                        key_notes = generate_key_notes(
+                            lecture_title=lecture.replace(".mp4", "").replace(".mp3", "").replace(".wav", ""),
+                            lecture_subject=subject,
+                            lecture_transcript=transcript
+                        )
+                        
+                        # Generate PDF
+                        pdf_content = generate_notes_pdf(
+                            lecture_title=lecture.replace(".mp4", "").replace(".mp3", "").replace(".wav", ""),
+                            lecture_subject=subject,
+                            lecture_notes=key_notes,
+                            lecture_date=date
+                        )
+                        
+                        # Create download button
+                        filename = f"{subject}_{lecture.rsplit('.', 1)[0]}_notes.pdf"
+                        st.download_button(
+                            label="✅ Click to download PDF",
+                            data=pdf_content,
+                            file_name=filename,
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                        st.success("✅ PDF notes generated successfully!")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error generating PDF: {str(e)}")
+        
+        with col_notes2:
+            if st.button("📋 Download as Word", use_container_width=True, key="download_word"):
+                with st.spinner("⏳ Generating Word notes..."):
+                    try:
+                        # Load lecture transcript
+                        transcript_path = st.session_state.current_path.rsplit(".", 1)[0] + ".txt"
+                        if os.path.exists(transcript_path):
+                            with open(transcript_path, "r", encoding="utf-8") as f:
+                                transcript = f.read()
+                        else:
+                            transcript = "Lecture content not available. Please check the transcript file."
+                        
+                        # Generate key notes using Gemini AI
+                        key_notes = generate_key_notes(
+                            lecture_title=lecture.replace(".mp4", "").replace(".mp3", "").replace(".wav", ""),
+                            lecture_subject=subject,
+                            lecture_transcript=transcript
+                        )
+                        
+                        # Generate Word document
+                        word_content = generate_notes_word(
+                            lecture_title=lecture.replace(".mp4", "").replace(".mp3", "").replace(".wav", ""),
+                            lecture_subject=subject,
+                            lecture_notes=key_notes,
+                            lecture_date=date
+                        )
+                        
+                        # Create download button
+                        filename = f"{subject}_{lecture.rsplit('.', 1)[0]}_notes.docx"
+                        st.download_button(
+                            label="✅ Click to download Word",
+                            data=word_content,
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True
+                        )
+                        st.success("✅ Word notes generated successfully!")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error generating Word document: {str(e)}")
 
 # ================== AI CHAT (HYBRID KNOWLEDGE) ==================
 
 def is_greeting(text):
-    greetings = ["hi", "hai", "hello", "hey", "hii"]
+    greetings = ["hi", "hai", "hello", "hey", "hii","greetings", "good morning", "good afternoon", "good evening"]
     return text.lower().strip() in greetings
 
 
 if menu == "🤖 AI Chat":
+    # Initialize chat session state variables
+    if "current_conversation_id" not in st.session_state:
+        st.session_state.current_conversation_id = generate_conversation_id()
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "document_context" not in st.session_state:
+        st.session_state.document_context = None
+    if "document_name" not in st.session_state:
+        st.session_state.document_name = None
+    
     # Add comprehensive chat page styling
     st.markdown("""
     <style>
@@ -1605,6 +1671,83 @@ if menu == "🤖 AI Chat":
         margin-bottom: 1rem;
     }
 
+    /* File upload button styling */
+    .file-upload-btn {
+        background: linear-gradient(135deg, rgba(255, 77, 79, 0.2) 0%, rgba(255, 77, 79, 0.1) 100%);
+        border: 1px solid rgba(255, 77, 79, 0.3);
+        border-radius: 8px;
+        padding: 10px 16px;
+        color: #ff4d4f;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .file-upload-btn:hover {
+        background: linear-gradient(135deg, rgba(255, 77, 79, 0.3) 0%, rgba(255, 77, 79, 0.2) 100%);
+        border-color: #ff4d4f;
+    }
+    
+    /* Style file uploader button */
+    div[data-testid="stFileUploader"] {
+        width: 100%;
+    }
+    
+    div[data-testid="stFileUploader"] > div {
+        padding: 0 !important;
+    }
+    
+    div[data-testid="stFileUploader"] button {
+        width: 100% !important;
+        padding: 8px !important;
+        background: rgba(255, 77, 79, 0.1) !important;
+        border: 1px solid rgba(255, 77, 79, 0.3) !important;
+        border-radius: 8px !important;
+        color: #ff4d4f !important;
+        font-size: 18px !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    div[data-testid="stFileUploader"] button:hover {
+        background: rgba(255, 77, 79, 0.2) !important;
+        border-color: #ff4d4f !important;
+    }
+
+    /* Sidebar history styling */
+    .chat-history-item {
+        padding: 12px;
+        margin-bottom: 8px;
+        background: rgba(255, 77, 79, 0.08);
+        border-left: 3px solid transparent;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        word-break: break-word;
+    }
+
+    .chat-history-item:hover {
+        background: rgba(255, 77, 79, 0.15);
+        border-left-color: #ff4d4f;
+    }
+
+    .chat-history-item.active {
+        background: rgba(255, 77, 79, 0.2);
+        border-left-color: #ff4d4f;
+    }
+
+    .document-badge {
+        display: inline-block;
+        background: #ff4d4f;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-bottom: 10px;
+    }
+
     @media (max-width: 768px) {
         .chat-header {
             padding: 1.5rem 1rem;
@@ -1619,6 +1762,7 @@ if menu == "🤖 AI Chat":
     </style>
     """, unsafe_allow_html=True)
 
+    # ==================== MAIN CHAT AREA ====================
     # Chat header
     st.markdown("""
     <div class="chat-header">
@@ -1627,8 +1771,20 @@ if menu == "🤖 AI Chat":
     </div>
     """, unsafe_allow_html=True)
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    # Display uploaded document info at top if present
+    if st.session_state.document_context:
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.markdown(f"""
+            <div class="document-badge">
+                📎 Uploaded: {st.session_state.document_name}
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            if st.button("❌ Remove", use_container_width=True, key="remove_doc"):
+                st.session_state.document_context = None
+                st.session_state.document_name = None
+                st.rerun()
 
     # Show empty state if no messages
     if len(st.session_state.messages) == 0:
@@ -1637,7 +1793,7 @@ if menu == "🤖 AI Chat":
             <h3>💬 Start a Conversation</h3>
             <p>Ask me anything about your classroom lectures or general knowledge!</p>
             <p style="margin-top: 1rem; font-size: 14px;">
-                Try: "What is AI?" or "Explain machine learning basics"
+                💡 Tip: Upload a PDF or Word document (📎) to ask questions about its content!
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -1649,9 +1805,31 @@ if menu == "🤖 AI Chat":
             if "source" in msg:
                 st.caption(msg["source"])
 
-    # ---- CHAT INPUT ----
+    # ---- CHAT INPUT WITH FILE UPLOAD BUTTON ----
+    col_btn, col_input = st.columns([1.2, 9.2])
+    
+    with col_btn:
+        # File uploader button
+        uploaded_file = st.file_uploader(
+            "Attach File",
+            type=["pdf", "docx", "doc"],
+            label_visibility="visible",
+            key="file_upload"
+        )
+        
+        if uploaded_file:
+            with st.spinner("Processing document..."):
+                try:
+                    file_ext = uploaded_file.name.split(".")[-1].lower()
+                    extracted_text, filename = extract_text_from_document(uploaded_file, file_ext)
+                    st.session_state.document_context = extracted_text
+                    st.session_state.document_name = filename
+                    st.success(f"✅ {filename} uploaded!")
+                except Exception as e:
+                    st.error(f"Error processing file: {str(e)}")
+    
     user_input = st.chat_input("Ask your question...")
-
+    
     if user_input:
         # ---- USER MESSAGE ----
         st.session_state.messages.append(
@@ -1669,18 +1847,28 @@ if menu == "🤖 AI Chat":
                 source = "🤖 System Response"
 
             else:
+                # Build context with document + lectures
+                document_context = st.session_state.document_context or ""
                 lecture_context = load_all_lectures()
+                
+                combined_context = ""
+                source = "🌐 Source: External Knowledge (Gemini)"
+                
+                if st.session_state.document_name and document_context:
+                    combined_context = f"UPLOADED DOCUMENT: {st.session_state.document_name}\n{document_context}\n\n"
+                    source = f"📄 Source: {st.session_state.document_name}"
+                
+                combined_context += f"CLASSROOM LECTURES:\n{lecture_context}"
 
-                # ✅ STEP 1: Internal lecture-only check
+                # ✅ STEP 1: Internal check with document + lectures
                 internal_prompt = f"""
 You are Classroom AI.
 
-Answer the question STRICTLY using the classroom lecture content below.
-If the answer is not present or insufficient, reply with exactly:
-NOT_FOUND
+Answer the question STRICTLY using the content provided below.
+If the answer is not present or insufficient in the provided content, you may use general knowledge.
 
-LECTURE CONTENT:
-{lecture_context}
+AVAILABLE CONTENT:
+{combined_context}
 
 QUESTION:
 {user_input}
@@ -1688,24 +1876,16 @@ QUESTION:
 
                 internal_reply = gemini_chat(internal_prompt)
 
-                # ✅ STEP 2: Decide source
-                if (
-                    internal_reply.strip() == "NOT_FOUND"
-                    or not lecture_context.strip()
-                ):
-                    # 🔁 External fallback
-                    external_prompt = f"""
-Answer the following question using your general knowledge.
-Explain clearly and in a student-friendly way.
-
-QUESTION:
-{user_input}
-"""
-                    final_reply = gemini_chat(external_prompt)
-                    source = "🌐 Source: External Knowledge (Gemini)"
-                else:
+                # Check if answer was found in documents
+                if document_context and st.session_state.document_name:
+                    final_reply = internal_reply
+                    source = f"📄 Source: {st.session_state.document_name}"
+                elif lecture_context.strip():
                     final_reply = internal_reply
                     source = "📘 Source: Classroom Lectures"
+                else:
+                    final_reply = internal_reply
+                    source = "🌐 Source: General Knowledge (Gemini)"
 
             # ---- DISPLAY ASSISTANT ----
             st.markdown(final_reply)
@@ -1719,6 +1899,10 @@ QUESTION:
                 "source": source
             }
         )
+        
+        # Auto-save conversation every time a message is sent
+        save_chat_conversation(st.session_state.user, st.session_state.current_conversation_id, st.session_state.messages)
+
 # ================== LOGOUT ==================
 st.sidebar.divider()
 if st.sidebar.button("🚪 Logout"):
