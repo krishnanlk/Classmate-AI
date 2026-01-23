@@ -3,3 +3,8 @@ __pycache__/
 *.env
 gemini.env
 *.pyc
+cloud_storage/
+chat_history/
+*.mp4
+*.wav
+*.txt
