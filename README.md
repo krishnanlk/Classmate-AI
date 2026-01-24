@@ -425,6 +425,7 @@ Classmate-AI is designed to enhance student learning through AI assistance. Feat
 
 ## 📈 Roadmap
 
+<<<<<<< HEAD
 - [ ] **Lecture-Aware Quiz Generator** - Auto-generate MCQs, Short Answer, and True/False questions from lectures (Students only)
 - [ ] Advanced analytics dashboard for learning progress tracking
 - [ ] Multi-language support for international students
@@ -461,7 +462,7 @@ Classmate-AI is designed to enhance student learning through AI assistance. Feat
 
 ---
 
-**Last Updated**: January 23, 2026  
+**Last Updated**: January 24, 2026  
 **Current Version**: 1.1.0  
 **Author**: Krishnan LK  
 **Repository**: [krishnanlk/Classmate-AI](https://github.com/krishnanlk/Classmate-AI)  
