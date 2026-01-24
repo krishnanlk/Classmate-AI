@@ -36,7 +36,25 @@ Answer format:
         # Either external knowledge OR app.py already built the prompt
         prompt = question
 
-    # Call Gemini
-    response = client.generate_content(prompt)
-
-    return response.text.strip()
+    # Call Gemini with error handling
+    try:
+        response = client.generate_content(prompt)
+        
+        # Check if response has valid content
+        if response.parts and len(response.parts) > 0:
+            return response.text.strip()
+        else:
+            # Handle empty or blocked response
+            return "I couldn't generate a response. This might be due to content filtering or API limitations. Please try again with a different question."
+    
+    except ValueError as e:
+        # Handle API errors (blocked content, rate limits, etc.)
+        error_msg = str(e)
+        if "finish_reason" in error_msg or "response" in error_msg.lower():
+            return "The API returned an empty response. This could mean:\n• Your question was filtered by safety systems\n• API rate limit exceeded\n• Please try rephrasing your question or try again later."
+        else:
+            return f"API Error: {error_msg}"
+    
+    except Exception as e:
+        # Catch other unexpected errors
+        return f"An error occurred: {str(e)}"
